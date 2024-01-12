@@ -3,6 +3,8 @@ from __init__ import CURSOR, CONN
 
 class Department:
 
+    all = {} #dictionary that will save all the Department objects created and saved in the db
+
     def __init__(self, name, location, id=None):
         self.id = id
         self.name = name
@@ -45,6 +47,7 @@ class Department:
         CONN.commit()
 
         self.id = CURSOR.lastrowid
+        type(self).all[self.id] = self
 
     @classmethod
     def create(cls, name, location):
@@ -72,3 +75,55 @@ class Department:
 
         CURSOR.execute(sql, (self.id,))
         CONN.commit()
+
+        del type(self).all[self.id]
+
+        self.id = None
+
+    @classmethod
+    def instance_from_db(cls, row):
+        department = cls.all.get(row[0])
+        if department:
+            department.name = row[1]
+            department.location = row[2]
+        
+        else:
+            department = cls(row[1], row[2])
+            department.id = row[0]
+            cls.all[department.id] = department
+
+        return department
+
+    @classmethod
+    def get_all(cls):
+        sql="""
+            SELECT *
+            FROM departments
+        """
+
+        rows = CURSOR.execute(sql).fetchall() 
+        """ fetchall() method retrieves all the quert results an places them in a tuple sequentially"""
+
+        return [cls.instance_from_db(row) for row in rows] #returns a list of python object department for each instance or row from the db
+    
+    @classmethod
+    def find_by_id(cls, id):
+        sql = """
+            SELECT * 
+            FROM departments
+            WHERE id = ?
+        """
+
+        row = CURSOR.execute(sql, (id,)).fetchone() #fetchone() returns first element from fetchall() ; id as second parameter in tuple to match format data is returned in db. Must have a comma after
+        return cls.instance_from_db(row) if row else None #return the value from the cls method if its a row, else return nothing
+
+    @classmethod
+    def find_by_name(cls, name):
+        sql = """
+            SELECT * 
+            FROM departments
+            WHERE name is ?
+        """
+
+        row = CURSOR.execute(sql, (name,)).fetchone()
+        return cls.instance_from_db(row) if row else None
